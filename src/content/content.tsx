@@ -10,8 +10,9 @@ import {
 } from 'lucide-react'
 import { Highlight, themes } from 'prism-react-renderer'
 import { Input } from '@/components/ui/input'
-import { SYSTEM_PROMPT } from '@/constants/prompt'
+import { buildSystemPrompt } from '@/constants/prompt'
 import { extractCode } from './util'
+import { readPageContext, type PlatformContext } from './platformContext'
 
 import {
   Accordion,
@@ -40,6 +41,7 @@ import {
 } from '@/components/ui/select'
 import { LIMIT_VALUE } from '@/lib/indexedDB'
 import { useIndexDB } from '@/hooks/useIndexDB'
+import { getExtensionPortalContainer } from './shadowDom'
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -59,9 +61,7 @@ import {
 
 interface ChatBoxProps {
   visible: boolean
-  context: {
-    problemStatement: string
-  }
+  context: PlatformContext
   model: ValidModel
   apikey: string
   heandelModel: (v: ValidModel) => void
@@ -95,6 +95,15 @@ const ChatBox: React.FC<ChatBoxProps> = ({
   const { fetchChatHistory, saveChatHistory } = useIndexDB()
 
   const getProblemName = () => {
+    if (context.platform === 'learnflow') {
+      return (
+        context.courseId ||
+        context.lectureId ||
+        window.location.pathname ||
+        'LearnFlow Course'
+      )
+    }
+
     const url = window.location.href
     const match = /\/problems\/([^/]+)/.exec(url)
     return match ? match[1] : 'Unknown Problem'
@@ -154,12 +163,11 @@ const ChatBox: React.FC<ChatBoxProps> = ({
 
     const extractedCode = extractCode(userCurrentCodeContainer)
 
-    const systemPromptModified = SYSTEM_PROMPT.replace(
-      /{{problem_statement}}/gi,
-      context.problemStatement
+    const systemPromptModified = buildSystemPrompt(
+      context,
+      extractedCode,
+      programmingLanguage
     )
-      .replace(/{{programming_language}}/g, programmingLanguage)
-      .replace(/{{user_code}}/g, extractedCode)
 
     const PCH = parseChatHistory(chatHistory)
 
@@ -270,14 +278,14 @@ const ChatBox: React.FC<ChatBoxProps> = ({
 
   return (
     <Card className="mb-2 ">
-      <div className="flex gap-2 items-center justify-between h-20 rounded-t-lg p-4">
+      <div className="flex gap-2 items-center  justify-between h-20 rounded-t-lg p-4">
         <div className="flex gap-2 items-center justify-start">
           <div className="bg-white rounded-full p-2">
             <Bot color="#000" className="h-6 w-6" />
           </div>
           <div>
-            <h3 className="font-bold text-lg">Need Help?</h3>
-            <h6 className="font-normal text-xs">Always online</h6>
+            <h3 className="font-bold text-lg">Had Doubt?</h3>
+            <h6 className="font-normal text-xs">Drop your thought</h6>
           </div>
         </div>
         <DropdownMenu>
@@ -499,9 +507,9 @@ const ChatBox: React.FC<ChatBoxProps> = ({
 
 const ContentPage: React.FC = () => {
   const [chatboxExpanded, setChatboxExpanded] = React.useState<boolean>(false)
-
-  const metaDescriptionEl = document.querySelector('meta[name=description]')
-  const problemStatement = metaDescriptionEl?.getAttribute('content') as string
+  const [pageContext, setPageContext] = React.useState<PlatformContext>(() =>
+    readPageContext()
+  )
 
   const [modal, setModal] = React.useState<ValidModel | null | undefined>(null)
   const [apiKey, setApiKey] = React.useState<string | null | undefined>(null)
@@ -519,39 +527,54 @@ const ContentPage: React.FC = () => {
     }
   }
 
-  React.useEffect(() => {
-    document.addEventListener('click', handleDocumentClick)
-    return () => {
-      document.removeEventListener('click', handleDocumentClick)
-    }
-  }, [])
-  ;(async () => {
+  const loadConfig = async () => {
     const { getKeyModel, selectModel } = useChromeStorage()
-    const { model, apiKey } = await getKeyModel(await selectModel())
-
+    const currentSelected = await selectModel()
+    setSelectedModel(currentSelected)
+    const { model, apiKey } = await getKeyModel(currentSelected)
     setModal(model)
     setApiKey(apiKey)
-  })()
-
-  const heandelModel = (v: ValidModel) => {
-    if (v) {
-      const { setSelectModel } = useChromeStorage()
-      setSelectModel(v)
-      setSelectedModel(v)
-    }
   }
 
   React.useEffect(() => {
-    const loadChromeStorage = async () => {
-      if (!chrome) return
-
-      const { selectModel } = useChromeStorage()
-
-      setSelectedModel(await selectModel())
+    const syncContext = () => setPageContext(readPageContext())
+    syncContext()
+    document.addEventListener('click', handleDocumentClick)
+    document.addEventListener('learnflow:lecture-change', syncContext)
+    return () => {
+      document.removeEventListener('click', handleDocumentClick)
+      document.removeEventListener('learnflow:lecture-change', syncContext)
     }
-
-    loadChromeStorage()
   }, [])
+
+  React.useEffect(() => {
+    loadConfig()
+
+    if (
+      typeof chrome !== 'undefined' &&
+      chrome.storage &&
+      chrome.storage.onChanged
+    ) {
+      const handleStorageChange = () => {
+        loadConfig()
+      }
+      chrome.storage.onChanged.addListener(handleStorageChange)
+      return () => {
+        chrome.storage.onChanged.removeListener(handleStorageChange)
+      }
+    }
+  }, [])
+
+  const heandelModel = async (v: ValidModel) => {
+    if (v) {
+      const { setSelectModel, getKeyModel } = useChromeStorage()
+      await setSelectModel(v)
+      setSelectedModel(v)
+      const { model, apiKey } = await getKeyModel(v)
+      setModal(model)
+      setApiKey(apiKey)
+    }
+  }
 
   return (
     <div
@@ -561,6 +584,7 @@ const ContentPage: React.FC = () => {
         position: 'fixed',
         bottom: '30px',
         right: '30px',
+        pointerEvents: 'auto',
       }}
     >
       {!modal || !apiKey ? (
@@ -586,13 +610,17 @@ const ContentPage: React.FC = () => {
                   )}
                   {selectedModel && (
                     <>
-                      <p>
-                        We couldn't find any API key for selected model{' '}
-                        <b>
-                          <u>{selectedModel}</u>
+                      <p className="text-center text-sm">
+                        No API Key found for{' '}
+                        <b className="text-whisperOrange">
+                          {VALID_MODELS.find((m) => m.name === selectedModel)
+                            ?.display || selectedModel}
                         </b>
                       </p>
-                      <p>you can select another models</p>
+                      <p className="text-xs text-muted-foreground text-center">
+                        Select a model with an active API Key, or configure one
+                        in the extension popup.
+                      </p>
                       <Select
                         onValueChange={(v: ValidModel) => heandelModel(v)}
                         value={selectedModel}
@@ -600,9 +628,9 @@ const ContentPage: React.FC = () => {
                         <SelectTrigger className="w-56">
                           <SelectValue placeholder="Select a model" />
                         </SelectTrigger>
-                        <SelectContent>
+                        <SelectContent position="popper">
                           <SelectGroup>
-                            <SelectLabel>Model</SelectLabel>
+                            <SelectLabel>Supported Models</SelectLabel>
                             <SelectSeparator />
                             {VALID_MODELS.map((modelOption) => (
                               <SelectItem
@@ -625,7 +653,7 @@ const ContentPage: React.FC = () => {
       ) : (
         <ChatBox
           visible={chatboxExpanded}
-          context={{ problemStatement }}
+          context={pageContext}
           model={modal}
           apikey={apiKey}
           heandelModel={heandelModel}

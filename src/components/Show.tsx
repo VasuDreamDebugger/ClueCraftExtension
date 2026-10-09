@@ -17,7 +17,7 @@ const Show: React.FC<Props> = ({ show, children }: Props): React.ReactNode => {
   return show ? (
     children
   ) : (
-    <div className='w-full h-full flex items-center justify-center'>
+    <div className="w-full h-full flex items-center justify-center">
       <Spinner />
     </div>
   )

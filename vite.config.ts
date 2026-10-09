@@ -6,6 +6,13 @@ import path from 'path'
 
 // https://vite.dev/config/
 export default defineConfig({
+  server: {
+    port: 5173,
+    strictPort: true,
+    hmr: {
+      port: 5173,
+    },
+  },
   plugins: [react(), crx({ manifest })],
   resolve: {
     alias: {

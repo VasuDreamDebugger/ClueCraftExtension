@@ -3,9 +3,9 @@ import {
   GenerateResponseReturnType,
   ModalInterface,
 } from '../../interface/ModalInterface'
-import { createGoogleGenerativeAI } from '@ai-sdk/google'
-import { generateObjectResponce } from '../utils'
+import { GoogleGenAI } from '@google/genai'
 import { VALID_MODELS } from '@/constants/valid_modals'
+import { outputSchema } from '@/schema/modeOutput'
 
 export class GeminiAI_1_5_pro implements ModalInterface {
   name = 'gemini_1.5_pro'
@@ -19,23 +19,32 @@ export class GeminiAI_1_5_pro implements ModalInterface {
     props: GenerateResponseParamsType
   ): GenerateResponseReturnType {
     try {
-      const google = createGoogleGenerativeAI({
-        apiKey: this.apiKey,
+      const ai = new GoogleGenAI({ apiKey: this.apiKey })
+      const modelConfig = VALID_MODELS.find((model) => model.name === this.name)
+      const targetModel = modelConfig?.model || 'gemini-1.5-pro-latest'
+
+      const promptText = `${props.systemPrompt}\n\nExtracted User Code:\n${props.extractedCode || ''}\n\nUser Request: ${props.prompt}`
+
+      const response = await ai.models.generateContent({
+        model: targetModel,
+        contents: [
+          {
+            role: 'user',
+            parts: [{ text: promptText }],
+          },
+        ],
+        config: {
+          responseMimeType: 'application/json',
+        },
       })
 
-      let data = await generateObjectResponce({
-        model: google(
-          VALID_MODELS.find((model) => model.name === this.name)?.model!
-        ),
-        messages: props.messages,
-        systemPrompt: props.systemPrompt,
-        prompt: props.prompt,
-        extractedCode: props.extractedCode,
-      })
+      const rawText = response.text || ''
+      const parsedObject = JSON.parse(rawText)
+      const validatedData = outputSchema.parse(parsedObject)
 
       return {
         error: null,
-        success: data.object,
+        success: validatedData,
       }
     } catch (error: any) {
       return { error, success: null }

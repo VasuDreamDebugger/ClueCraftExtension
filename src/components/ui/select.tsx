@@ -10,6 +10,7 @@ import {
 import * as SelectPrimitive from '@radix-ui/react-select'
 import { cn } from '@/lib/utils'
 import { motion } from 'framer-motion'
+import { getExtensionPortalContainer } from '@/content/shadowDom'
 
 const Select = SelectPrimitive.Root
 const SelectGroup = SelectPrimitive.Group
@@ -129,65 +130,16 @@ const SelectScrollDownButton = React.forwardRef<
 SelectScrollDownButton.displayName =
   SelectPrimitive.ScrollDownButton.displayName
 
-// Animated SelectContent component
-const AnimatedSelectContent = React.forwardRef<
-  React.ElementRef<typeof SelectPrimitive.Content>,
-  React.ComponentPropsWithoutRef<typeof SelectPrimitive.Content> & {
-    selectedVariant: keyof typeof selectAnimationVariants
-  }
->(
-  (
-    { className, children, position = 'popper', selectedVariant, ...props },
-    ref
-  ) => (
-    <SelectPrimitive.Portal>
-      <SelectPrimitive.Content
-        className={cn(
-          'relative z-50 max-h-96 my-2 min-w-[8rem] overflow-hidden rounded-md border bg-popover text-popover-foreground shadow-md',
-          position === 'popper' &&
-            'data-[side=bottom]:translate-y-1 data-[side=left]:-translate-x-1 data-[side=right]:translate-x-1 data-[side=top]:-translate-y-1',
-          className
-        )}
-        ref={ref}
-        asChild
-        position={position}
-        {...props}
-      >
-        <motion.div
-          className={cn(
-            'relative z-50 max-h-96 min-w-[8rem] overflow-hidden rounded-md border bg-popover text-popover-foreground shadow-md',
-            className
-          )}
-          {...selectAnimationVariants[selectedVariant]}
-        >
-          <SelectScrollUpButton />
-          <SelectPrimitive.Viewport
-            className={cn(
-              'p-1',
-              position === 'popper' &&
-                'h-[var(--radix-select-trigger-height)] w-full min-w-[var(--radix-select-trigger-width)]'
-            )}
-          >
-            {children}
-          </SelectPrimitive.Viewport>
-          <SelectScrollDownButton />
-        </motion.div>
-      </SelectPrimitive.Content>
-    </SelectPrimitive.Portal>
-  )
-)
-AnimatedSelectContent.displayName = SelectPrimitive.Content.displayName
-
-// Non-animated SelectContent component
-const StaticSelectContent = React.forwardRef<
+const SelectContent = React.forwardRef<
   React.ElementRef<typeof SelectPrimitive.Content>,
   React.ComponentPropsWithoutRef<typeof SelectPrimitive.Content>
 >(({ className, children, position = 'popper', ...props }, ref) => (
-  <SelectPrimitive.Portal>
+  <SelectPrimitive.Portal container={getExtensionPortalContainer()}>
     <SelectPrimitive.Content
       ref={ref}
+      onPointerDownOutside={(e) => e.preventDefault()}
       className={cn(
-        'relative z-50 max-h-96 min-w-[8rem] overflow-hidden rounded-md border bg-popover text-popover-foreground shadow-md data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 data-[side=bottom]:slide-in-from-top-2 data-[side=left]:slide-in-from-right-2 data-[side=right]:slide-in-from-left-2 data-[side=top]:slide-in-from-bottom-2',
+        'relative z-[99999] my-1 min-w-[12rem] overflow-hidden rounded-xl border border-sky-200 bg-white text-slate-800 shadow-xl shadow-sky-900/15 p-1 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 data-[side=bottom]:slide-in-from-top-2 data-[side=left]:slide-in-from-right-2 data-[side=right]:slide-in-from-left-2 data-[side=top]:slide-in-from-bottom-2',
         position === 'popper' &&
           'data-[side=bottom]:translate-y-1 data-[side=left]:-translate-x-1 data-[side=right]:translate-x-1 data-[side=top]:-translate-y-1',
         className
@@ -195,38 +147,18 @@ const StaticSelectContent = React.forwardRef<
       position={position}
       {...props}
     >
-      <SelectScrollUpButton />
       <SelectPrimitive.Viewport
         className={cn(
-          'p-1',
+          'p-1 w-full max-h-[300px] overflow-y-auto',
           position === 'popper' &&
-            'h-[var(--radix-select-trigger-height)] w-full min-w-[var(--radix-select-trigger-width)]'
+            'w-full min-w-[var(--radix-select-trigger-width)]'
         )}
       >
         {children}
       </SelectPrimitive.Viewport>
-      <SelectScrollDownButton />
     </SelectPrimitive.Content>
   </SelectPrimitive.Portal>
 ))
-StaticSelectContent.displayName = SelectPrimitive.Content.displayName
-
-const SelectContent = React.forwardRef<
-  React.ElementRef<typeof SelectPrimitive.Content>,
-  React.ComponentPropsWithoutRef<typeof SelectPrimitive.Content> & {
-    variants?: keyof typeof selectAnimationVariants
-  }
->((props, ref) => {
-  const selectedVariant = props.variants || 'zoom'
-
-  return (
-    <AnimatedSelectContent
-      selectedVariant={selectedVariant}
-      ref={ref}
-      {...props}
-    />
-  )
-})
 
 SelectContent.displayName = 'SelectContent'
 
@@ -236,7 +168,10 @@ const SelectLabel = React.forwardRef<
 >(({ className, ...props }, ref) => (
   <SelectPrimitive.Label
     ref={ref}
-    className={cn('px-2 py-1.5 text-sm font-semibold', className)}
+    className={cn(
+      'px-2.5 py-1.5 text-xs font-bold text-sky-600 uppercase tracking-wider',
+      className
+    )}
     {...props}
   />
 ))
@@ -249,12 +184,12 @@ const SelectItem = React.forwardRef<
   <SelectPrimitive.Item
     ref={ref}
     className={cn(
-      'relative flex w-full cursor-default select-none items-center rounded-sm py-1.5 pl-2 pr-8 text-sm outline-none focus:bg-primary focus:text-primary-foreground data-[disabled]:pointer-events-none data-[disabled]:opacity-50',
+      'relative flex w-full cursor-pointer select-none items-center rounded-lg py-2 pl-2.5 pr-8 text-xs font-medium outline-none text-slate-700 hover:bg-sky-50 hover:text-sky-700 focus:bg-emerald-50 focus:text-emerald-700 data-[disabled]:pointer-events-none data-[disabled]:opacity-50 transition-colors',
       className
     )}
     {...props}
   >
-    <span className="absolute right-2 flex h-3.5 w-3.5 items-center justify-center">
+    <span className="absolute right-2.5 flex h-3.5 w-3.5 items-center justify-center text-emerald-500 font-bold">
       <SelectPrimitive.ItemIndicator>
         <CheckIcon className="h-4 w-4" />
       </SelectPrimitive.ItemIndicator>

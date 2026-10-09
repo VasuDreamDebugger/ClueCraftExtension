@@ -7,11 +7,10 @@ import { EyeClosedIcon, EyeOpenIcon } from '@radix-ui/react-icons'
 /**
  * Props for the Input component.
  */
-export interface InputProps
-  extends Omit<
-    React.InputHTMLAttributes<HTMLInputElement>,
-    'children' | 'prefix' | 'suffix'
-  > {
+export interface InputProps extends Omit<
+  React.InputHTMLAttributes<HTMLInputElement>,
+  'children' | 'prefix' | 'suffix'
+> {
   /**
    * Additional class names to apply to the outer container.
    */
@@ -201,7 +200,7 @@ const HideApiKey = React.forwardRef<
         onClick={() => setShowPassword((prev) => !prev)}
         disabled={props.disabled}
       >
-        <div className='flex'>
+        <div className="flex">
           <div className="bg-background w-4 h-4" />
           {showPassword ? (
             <EyeOpenIcon className="h-4 w-4 bg-background" aria-hidden="true" />

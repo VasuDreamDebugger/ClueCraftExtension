@@ -3,6 +3,7 @@ import * as DropdownMenuPrimitive from "@radix-ui/react-dropdown-menu"
 import { Check, ChevronRight, Circle } from "lucide-react"
 
 import { cn } from "@/lib/utils"
+import { getExtensionPortalContainer } from "@/content/shadowDom"
 
 const DropdownMenu = DropdownMenuPrimitive.Root
 
@@ -10,7 +11,14 @@ const DropdownMenuTrigger = DropdownMenuPrimitive.Trigger
 
 const DropdownMenuGroup = DropdownMenuPrimitive.Group
 
-const DropdownMenuPortal = DropdownMenuPrimitive.Portal
+const DropdownMenuPortal = (
+  props: React.ComponentProps<typeof DropdownMenuPrimitive.Portal>
+) => (
+  <DropdownMenuPrimitive.Portal
+    container={getExtensionPortalContainer()}
+    {...props}
+  />
+)
 
 const DropdownMenuSub = DropdownMenuPrimitive.Sub
 
@@ -58,7 +66,7 @@ const DropdownMenuContent = React.forwardRef<
   React.ElementRef<typeof DropdownMenuPrimitive.Content>,
   React.ComponentPropsWithoutRef<typeof DropdownMenuPrimitive.Content>
 >(({ className, sideOffset = 4, ...props }, ref) => (
-  <DropdownMenuPrimitive.Portal>
+  <DropdownMenuPrimitive.Portal container={getExtensionPortalContainer()}>
     <DropdownMenuPrimitive.Content
       ref={ref}
       sideOffset={sideOffset}
